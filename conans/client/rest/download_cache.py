@@ -50,6 +50,7 @@ class CachedFileDownloader(object):
         # I'll see later what to do here
         if self._cache_folder:
             checksum = sha256 or sha1 or md5
+
             # If it is a user download, it must contain a checksum
             assert (not self._user_download) or (self._user_download and checksum)
             h = self._get_hash(url, checksum)
@@ -63,19 +64,24 @@ class CachedFileDownloader(object):
                 try:
                     if not os.path.exists(cached_path):
                         # here, try to download from remote cache artifactory
-
-                        # if not, try to download from url
                         try:
-                            self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
+                            self._file_downloader.download(self._remote_cache_url, cached_path, auth, retry, retry_wait,
                                                            overwrite, headers)
                             self._check_checksum(cached_path, md5, sha1, sha256)
 
-                            # and here upload to remote cache Artifactory
-
                         except Exception:
-                            if os.path.exists(cached_path):
-                                os.remove(cached_path)
-                            raise
+                           # if not on remote cache Artifcatory, try to download from url
+                            try:
+                                self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
+                                                               overwrite, headers)
+                                self._check_checksum(cached_path, md5, sha1, sha256)
+
+                                # and here upload to remote cache Artifactory
+
+                            except Exception:
+                                if os.path.exists(cached_path):
+                                    os.remove(cached_path)
+                                raise
                     else:
                         # specific check for corrupted cached files, will raise, but do nothing more
                         # user can report it or "rm -rf cache_folder/path/to/file"
