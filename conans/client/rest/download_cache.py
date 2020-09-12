@@ -30,8 +30,6 @@ class CachedFileDownloader(object):
         else:
             self._remote_cache_url = None
 
-        # print(self._remote_cache_url)
-
     @staticmethod
     def _check_checksum(cache_path, md5, sha1, sha256):
         if md5:
@@ -47,7 +45,6 @@ class CachedFileDownloader(object):
         """
 
         checksum = sha256 or sha1 or md5
-
         # If it is a user download, it must contain a checksum
         assert (not self._user_download) or (self._user_download and checksum)
         h = self._get_hash(url, checksum)
@@ -62,28 +59,39 @@ class CachedFileDownloader(object):
                 if not os.path.exists(cached_path):
                     # try to download from remote cache artifactory
                     try:
+                        # if remote_cache is None it will just raise an Exception and go on. No need to check.
+                        # it's easier to ask for forgiveness than permission
+
+                        # I don't really like this, I should refactor download to pass base url and path
+                        try:
+                            remote_url = ((self._remote_cache_url or "") +
+                                          urlparse(url).path).replace("//", "/").replace("http:/", "http://")
+                            print("trying to download from ", remote_url)
+                        except Exception:
+                            print("Error constructing remote_url")
+
+                        # auth hardcoded, feo, feo
                         self._file_downloader.download(
-                            self._remote_cache_url, cached_path, auth, retry, retry_wait,                            overwrite, headers)
+                            remote_url, cached_path, ('admin', '12345678'), retry, retry_wait, overwrite, headers)
                         self._check_checksum(cached_path, md5, sha1, sha256)
-                        print("SUCCESS to download from remote cache artifactory")
-                    except Exception:
+
+                    except Exception as e:
+                        print("FAILURE", e)
                         if os.path.exists(cached_path):
-                            print("removed cached path")
                             os.remove(cached_path)
-
-                        print("cannot download from remote cache artifactory",
-                              self._remote_cache_url, ", try from url")
-
                         # if not on remote cache Artifcatory, try to download from url
                         try:
+                            # print("trying to download from ", url)
                             self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
                                                            overwrite, headers)
+                            # print("SUCCESS")
                             self._check_checksum(cached_path, md5, sha1, sha256)
 
                             # and here upload to remote cache Artifactory
                             # TODO
 
-                        except Exception:
+                        except Exception as e:
+                            # print("FAILURE: ", e)
                             if os.path.exists(cached_path):
                                 os.remove(cached_path)
                             raise

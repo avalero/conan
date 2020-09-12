@@ -41,6 +41,9 @@ class FileDownloader(object):
                 # the dest folder before
                 raise ConanException("Error, the file to download already exists: '%s'" % file_path)
 
+        print("--------", url)
+        print("file path", file_path)
+
         return _call_with_retry(self._output, retry, retry_wait, self._download_file, url, auth,
                                 headers, file_path)
 
@@ -54,8 +57,10 @@ class FileDownloader(object):
             range_start = 0
 
         try:
+
             response = self._requester.get(url, stream=True, verify=self._verify_ssl, auth=auth,
                                            headers=headers)
+
         except Exception as exc:
             raise ConanException("Error downloading file %s: '%s'" % (url, exc))
 
