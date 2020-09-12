@@ -31,7 +31,10 @@ class DownloadCacheTest(unittest.TestCase):
         client.run("upload * --all --confirm")
         cache_folder = temp_folder()
         log_trace_file = os.path.join(temp_folder(), "mylog.txt")
+        # JFrog Artifactory CE URL
+        client.run('config set storage.remote_cache_url="localhost:8081"')
         client.run('config set storage.download_cache="%s"' % cache_folder)
+
         client.run('config set log.trace_file="%s"' % log_trace_file)
         client.run("remove * -f")
         client.run("install mypkg/0.1@user/testing")
@@ -50,6 +53,7 @@ class DownloadCacheTest(unittest.TestCase):
 
         # removing the config downloads things
         client.run('config rm storage.download_cache')
+        client.run('config rm storage.remote_cache_url')
         os.remove(log_trace_file)
         client.run("remove * -f")
         client.run('config set log.trace_file="%s"' % log_trace_file)
