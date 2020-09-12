@@ -46,64 +46,66 @@ class CachedFileDownloader(object):
         """ compatible interface of FileDownloader + checksum
         """
 
-        # TODO . Just to avoid erros if cache folder is not defined (due to the introduction of remote cache).
-        # I'll see later what to do here
-        if self._cache_folder:
-            checksum = sha256 or sha1 or md5
+        checksum = sha256 or sha1 or md5
 
-            # If it is a user download, it must contain a checksum
-            assert (not self._user_download) or (self._user_download and checksum)
-            h = self._get_hash(url, checksum)
-            lock = os.path.join(self._cache_folder, "locks", h)
-            cached_path = os.path.join(self._cache_folder, h)
-            with SimpleLock(lock):
-                # Once the process has access, make sure multithread is locked too
-                # as SimpleLock doesn't work multithread
-                thread_lock = self._thread_locks.setdefault(lock, Lock())
-                thread_lock.acquire()
-                try:
-                    if not os.path.exists(cached_path):
-                        # here, try to download from remote cache artifactory
+        # If it is a user download, it must contain a checksum
+        assert (not self._user_download) or (self._user_download and checksum)
+        h = self._get_hash(url, checksum)
+        lock = os.path.join(self._cache_folder, "locks", h)
+        cached_path = os.path.join(self._cache_folder, h)
+        with SimpleLock(lock):
+            # Once the process has access, make sure multithread is locked too
+            # as SimpleLock doesn't work multithread
+            thread_lock = self._thread_locks.setdefault(lock, Lock())
+            thread_lock.acquire()
+            try:
+                if not os.path.exists(cached_path):
+                    # try to download from remote cache artifactory
+                    try:
+                        self._file_downloader.download(
+                            self._remote_cache_url, cached_path, auth, retry, retry_wait,                            overwrite, headers)
+                        self._check_checksum(cached_path, md5, sha1, sha256)
+                        print("SUCCESS to download from remote cache artifactory")
+                    except Exception:
+                        if os.path.exists(cached_path):
+                            print("removed cached path")
+                            os.remove(cached_path)
+
+                        print("cannot download from remote cache artifactory",
+                              self._remote_cache_url, ", try from url")
+
+                        # if not on remote cache Artifcatory, try to download from url
                         try:
-                            self._file_downloader.download(self._remote_cache_url, cached_path, auth, retry, retry_wait,
+                            self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
                                                            overwrite, headers)
                             self._check_checksum(cached_path, md5, sha1, sha256)
 
+                            # and here upload to remote cache Artifactory
+                            # TODO
+
                         except Exception:
-                           # if not on remote cache Artifcatory, try to download from url
-                            try:
-                                self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
-                                                               overwrite, headers)
-                                self._check_checksum(cached_path, md5, sha1, sha256)
+                            if os.path.exists(cached_path):
+                                os.remove(cached_path)
+                            raise
+                else:
+                    # specific check for corrupted cached files, will raise, but do nothing more
+                    # user can report it or "rm -rf cache_folder/path/to/file"
+                    try:
+                        self._check_checksum(cached_path, md5, sha1, sha256)
+                    except ConanException as e:
+                        raise ConanException("%s\nCached downloaded file corrupted: %s"
+                                             % (str(e), cached_path))
 
-                                # and here upload to remote cache Artifactory
-
-                            except Exception:
-                                if os.path.exists(cached_path):
-                                    os.remove(cached_path)
-                                raise
-                    else:
-                        # specific check for corrupted cached files, will raise, but do nothing more
-                        # user can report it or "rm -rf cache_folder/path/to/file"
-                        try:
-                            self._check_checksum(cached_path, md5, sha1, sha256)
-                        except ConanException as e:
-                            raise ConanException("%s\nCached downloaded file corrupted: %s"
-                                                 % (str(e), cached_path))
-
-                    if file_path is not None:
-                        file_path = os.path.abspath(file_path)
-                        mkdir(os.path.dirname(file_path))
-                        shutil.copy2(cached_path, file_path)
-                    else:
-                        with open(cached_path, 'rb') as handle:
-                            tmp = handle.read()
-                        return tmp
-                finally:
-                    thread_lock.release()
-        else:
-            print("cache folder not set")
-            # We will see what to do here
+                if file_path is not None:
+                    file_path = os.path.abspath(file_path)
+                    mkdir(os.path.dirname(file_path))
+                    shutil.copy2(cached_path, file_path)
+                else:
+                    with open(cached_path, 'rb') as handle:
+                        tmp = handle.read()
+                    return tmp
+            finally:
+                thread_lock.release()
 
     def _get_hash(self, url, checksum=None):
         """ For Api V2, the cached downloads always have recipe and package REVISIONS in the URL,
