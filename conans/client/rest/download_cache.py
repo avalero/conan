@@ -1,5 +1,7 @@
 import os
 import shutil
+import logging
+
 from threading import Lock
 
 from six.moves.urllib_parse import urlsplit, urlunsplit, urlparse
@@ -22,10 +24,13 @@ class CachedFileDownloader(object):
         self._user_download = user_download
 
         # check if url is well constructed, if not set to None
+
         if bool(urlparse(remote_cache_url).netloc):
             self._remote_cache_url = remote_cache_url
         else:
             self._remote_cache_url = None
+
+        # print(self._remote_cache_url)
 
     @staticmethod
     def _check_checksum(cache_path, md5, sha1, sha256):
@@ -57,10 +62,16 @@ class CachedFileDownloader(object):
                 thread_lock.acquire()
                 try:
                     if not os.path.exists(cached_path):
+                        # here, try to download from remote cache artifactory
+
+                        # if not, try to download from url
                         try:
                             self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
                                                            overwrite, headers)
                             self._check_checksum(cached_path, md5, sha1, sha256)
+
+                            # and here upload to remote cache Artifactory
+
                         except Exception:
                             if os.path.exists(cached_path):
                                 os.remove(cached_path)

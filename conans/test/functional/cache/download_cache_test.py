@@ -32,7 +32,7 @@ class DownloadCacheTest(unittest.TestCase):
         cache_folder = temp_folder()
         log_trace_file = os.path.join(temp_folder(), "mylog.txt")
         # JFrog Artifactory CE URL
-        client.run('config set storage.remote_cache_url="localhost:8081"')
+        client.run('config set storage.remote_cache_url="http://localhost:8081/"')
         client.run('config set storage.download_cache="%s"' % cache_folder)
 
         client.run('config set log.trace_file="%s"' % log_trace_file)
@@ -211,6 +211,7 @@ class DownloadCacheTest(unittest.TestCase):
 class CachedDownloaderUnitTest(unittest.TestCase):
     def setUp(self):
         cache_folder = temp_folder()
+        remote_cache_url = "localhost:8081"
 
         class FakeFileDownloader(object):
             def __init__(self):
@@ -227,8 +228,8 @@ class CachedDownloaderUnitTest(unittest.TestCase):
 
         self.file_downloader = FakeFileDownloader()
 
-        # Remote cache url folder set to None to avoid affecting this test
-        self.cached_downloader = CachedFileDownloader(cache_folder, None, self.file_downloader)
+        self.cached_downloader = CachedFileDownloader(
+            cache_folder, remote_cache_url, self.file_downloader)
 
     def concurrent_locks_test(self):
         folder = temp_folder()
