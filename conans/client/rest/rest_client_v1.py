@@ -46,9 +46,12 @@ class RestV1Methods(RestCommonMethods):
         """
         downloader = FileDownloader(self.requester, None, self.verify_ssl, self._config)
         download_cache = self._config.download_cache
-        if download_cache:
+        remote_cache_url = self._config.remote_cache_url  # remote backend cache
+
+        # if cache is defined (either local or remote) get from cache
+        if download_cache or remote_cache_url:
             assert snapshot_md5 is not None, "if download_cache is set, we need the file checksums"
-            downloader = CachedFileDownloader(download_cache, downloader)
+            downloader = CachedFileDownloader(download_cache, remote_cache_url, downloader)
         # Take advantage of filenames ordering, so that conan_package.tgz and conan_export.tgz
         # can be < conanfile, conaninfo, and sent always the last, so smaller files go first
         for filename, resource_url in sorted(file_urls.items(), reverse=True):
@@ -164,7 +167,7 @@ class RestV1Methods(RestCommonMethods):
         for filename, resource_url in sorted(file_urls.items()):
             if output and not output.is_terminal:
                 msg = "Uploading: %s" % filename if not display_name else (
-                            "Uploading %s -> %s" % (filename, display_name))
+                    "Uploading %s -> %s" % (filename, display_name))
                 output.writeln(msg)
             auth, dedup = self._file_server_capabilities(resource_url)
             try:
@@ -190,9 +193,12 @@ class RestV1Methods(RestCommonMethods):
         """
         downloader = FileDownloader(self.requester, self._output, self.verify_ssl, self._config)
         download_cache = self._config.download_cache
-        if download_cache:
+        remote_cache_url = self._config.remote_cache_url
+
+        # if cache is defined (either local or remote) get from cache
+        if download_cache or remote_cache_url:
             assert snapshot_md5 is not None, "if download_cache is set, we need the file checksums"
-            downloader = CachedFileDownloader(download_cache, downloader)
+            downloader = CachedFileDownloader(download_cache, remote_cache_url, downloader)
 
         ret = {}
         # Take advantage of filenames ordering, so that conan_package.tgz and conan_export.tgz

@@ -222,7 +222,9 @@ class CachedDownloaderUnitTest(unittest.TestCase):
                     return url
 
         self.file_downloader = FakeFileDownloader()
-        self.cached_downloader = CachedFileDownloader(cache_folder, self.file_downloader)
+
+        # Remote cache url folder set to None to avoid affecting this test
+        self.cached_downloader = CachedFileDownloader(cache_folder, None, self.file_downloader)
 
     def concurrent_locks_test(self):
         folder = temp_folder()

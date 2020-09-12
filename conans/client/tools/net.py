@@ -90,8 +90,9 @@ def download(url, filename, verify=True, out=None, retry=None, retry_wait=None, 
     checksum = sha256 or sha1 or md5
 
     downloader = FileDownloader(requester=requester, output=out, verify=verify, config=config)
-    if config and config.download_cache and checksum:
-        downloader = CachedFileDownloader(config.download_cache, downloader, user_download=True)
+    if config and (config.download_cache or config.remote_cache_url) and checksum:
+        downloader = CachedFileDownloader(
+            config.download_cache, config.remote_cache_url, downloader, user_download=True)
 
     def _download_file(file_url):
         # The download cache is only used if a checksum is provided, otherwise, a normal download

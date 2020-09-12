@@ -42,8 +42,13 @@ class RestV2Methods(RestCommonMethods):
     def _get_remote_file_contents(self, url, use_cache):
         # We don't want traces in output of these downloads, they are ugly in output
         downloader = FileDownloader(self.requester, None, self.verify_ssl, self._config)
-        if use_cache and self._config.download_cache:
-            downloader = CachedFileDownloader(self._config.download_cache, downloader)
+
+        # if cache is defined (either local or remote) get from cache
+        if use_cache and (self._config.download_cache or self._config.remote_cache_url):
+            downloader = CachedFileDownloader(self._config.download_cache,
+                                              self._config.remote_cache_url,
+                                              downloader)
+
         contents = downloader.download(url, auth=self.auth)
         return contents
 
@@ -72,7 +77,7 @@ class RestV2Methods(RestCommonMethods):
             return FileTreeManifest.loads(decode_text(content))
         except Exception as e:
             msg = "Error retrieving manifest file for package " \
-                  "'{}' from remote ({}): '{}'".format(repr(pref), self.remote_url, e)
+                "'{}' from remote ({}): '{}'".format(repr(pref), self.remote_url, e)
             logger.error(msg)
             logger.error(traceback.format_exc())
             raise ConanException(msg)
@@ -152,7 +157,7 @@ class RestV2Methods(RestCommonMethods):
             content = self._get_remote_file_contents(url, use_cache=cache)
             return decode_text(content)
 
-    @staticmethod
+    @ staticmethod
     def _is_dir(path, files):
         if path == ".":
             return True
@@ -163,7 +168,7 @@ class RestV2Methods(RestCommonMethods):
                 return True
         raise NotFoundException("The specified path doesn't exist")
 
-    @staticmethod
+    @ staticmethod
     def _list_dir_contents(path, files):
         ret = []
         for the_file in files["files"]:
@@ -195,7 +200,7 @@ class RestV2Methods(RestCommonMethods):
         for filename in sorted(files):
             if self._output and not self._output.is_terminal:
                 msg = "Uploading: %s" % filename if not display_name else (
-                            "Uploading %s -> %s" % (filename, display_name))
+                    "Uploading %s -> %s" % (filename, display_name))
                 self._output.writeln(msg)
             resource_url = urls[filename]
             try:
@@ -217,8 +222,13 @@ class RestV2Methods(RestCommonMethods):
 
     def _download_and_save_files(self, urls, dest_folder, files, use_cache):
         downloader = FileDownloader(self.requester, self._output, self.verify_ssl, self._config)
-        if use_cache and self._config.download_cache:
-            downloader = CachedFileDownloader(self._config.download_cache, downloader)
+
+        # if cache is defined (either local or remote) get from cache
+        if use_cache and (self._config.download_cache or self._config.remote_cache_url):
+            downloader = CachedFileDownloader(self._config.download_cache,
+                                              self._config.remote_cache_url,
+                                              downloader)
+                                              
         # Take advantage of filenames ordering, so that conan_package.tgz and conan_export.tgz
         # can be < conanfile, conaninfo, and sent always the last, so smaller files go first
         for filename in sorted(files, reverse=True):
