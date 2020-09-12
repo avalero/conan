@@ -11,6 +11,7 @@ from conans.errors import ConanException
 from conans.util.files import mkdir
 from conans.util.locks import SimpleLock
 from conans.util.sha import sha256 as sha256_sum
+from artifactory import ArtifactoryPath
 
 # Start programming
 
@@ -65,18 +66,19 @@ class CachedFileDownloader(object):
                         # I don't really like this, I should refactor download to pass base url and path
                         try:
                             remote_url = ((self._remote_cache_url or "") +
-                                          urlparse(url).path).replace("//", "/").replace("http:/", "http://")
-                            print("trying to download from ", remote_url)
+                                          file_path[(file_path.find("data") + len("data")):]
+                                          ).replace("//", "/").replace("http:/", "http://")
+                            print("remote_url ", remote_url)
+
                         except Exception:
                             print("Error constructing remote_url")
 
-                        # auth hardcoded, feo, feo
+                        # auth hardcoded, feo, feo. The best of me wants to put it on conan.conf
                         self._file_downloader.download(
                             remote_url, cached_path, ('admin', '12345678'), retry, retry_wait, overwrite, headers)
                         self._check_checksum(cached_path, md5, sha1, sha256)
 
                     except Exception as e:
-                        print("FAILURE", e)
                         if os.path.exists(cached_path):
                             os.remove(cached_path)
                         # if not on remote cache Artifcatory, try to download from url
@@ -84,14 +86,9 @@ class CachedFileDownloader(object):
                             # print("trying to download from ", url)
                             self._file_downloader.download(url, cached_path, auth, retry, retry_wait,
                                                            overwrite, headers)
-                            # print("SUCCESS")
                             self._check_checksum(cached_path, md5, sha1, sha256)
-
-                            # and here upload to remote cache Artifactory
-                            # TODO
-
                         except Exception as e:
-                            # print("FAILURE: ", e)
+                            print("FAILURE: ", e)
                             if os.path.exists(cached_path):
                                 os.remove(cached_path)
                             raise
@@ -108,10 +105,26 @@ class CachedFileDownloader(object):
                     file_path = os.path.abspath(file_path)
                     mkdir(os.path.dirname(file_path))
                     shutil.copy2(cached_path, file_path)
+
+                    # upload to remote artifact
+                    remote_file_path = file_path[(file_path.find("data") + len("data")):]
+                    remote_path = remote_file_path[:remote_file_path.rfind("/")]
+
+                    path = (self._remote_cache_url + remote_path).replace("//",
+                                                                          "/").replace("http:/", "http://")
+
+                    artifactory_path = ArtifactoryPath(path, auth=('admin', '12345678'))
+
+                    if not artifactory_path.exists():
+                        artifactory_path.mkdir()
+
+                    artifactory_path.deploy_file(file_path)
+
                 else:
                     with open(cached_path, 'rb') as handle:
                         tmp = handle.read()
                     return tmp
+
             finally:
                 thread_lock.release()
 
