@@ -446,6 +446,14 @@ class ConanClientConfigParser(ConfigParser, object):
             return None
 
     @property
+    def remote_cache_url(self):
+        try:
+            remote_cache_url = self.get_item("storage.remote_cache_url")
+            return remote_cache_url
+        except ConanException:
+            return None
+
+    @property
     def scm_to_conandata(self):
         try:
             scm_to_conandata = get_env("CONAN_SCM_TO_CONANDATA")
@@ -489,7 +497,7 @@ class ConanClientConfigParser(ConfigParser, object):
         if short_paths_home:
             current_dir = os.path.dirname(os.path.normpath(os.path.normcase(self.filename)))
             short_paths_dir = os.path.normpath(os.path.normcase(short_paths_home))
-            if current_dir == short_paths_dir  or \
+            if current_dir == short_paths_dir or \
                     short_paths_dir.startswith(current_dir + os.path.sep):
                 raise ConanException("Short path home '{}' (defined by conan.conf variable "
                                      "'user_home_short', or environment variable "
